@@ -233,6 +233,3 @@ book-gpt/
 
 ---
 
-## 📄 License
-
-MIT License — use freely, modify freely, attribute kindly.
