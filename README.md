@@ -1,4 +1,13 @@
-
+---
+title: BookGPT
+emoji: 📚
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
 
 # 📚 Book GPT — Local Graph-Augmented RAG
 
