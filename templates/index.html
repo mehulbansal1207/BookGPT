@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book GPT — Local Graph-Augmented RAG</title>
+    <meta name="description" content="Chat with your PDF books using local LLMs and concept graph retrieval.">
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📚</text></svg>">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/static/style.css?v=5">
+    <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+</head>
+<body>
+
+<!-- ── Sidebar ──────────────────────────────────────────────────────────── -->
+<aside class="sidebar" id="sidebar">
+    <div class="sidebar-header">
+        <h1>📚 Book GPT</h1>
+        <p class="subtitle">Graph-Augmented RAG</p>
+    </div>
+
+    <div class="sidebar-section">
+        <label class="field-label">Upload File</label>
+        <div class="drop-zone" id="dropZone">
+            <div class="drop-zone-icon">📄</div>
+            <p class="drop-zone-text">Drag &amp; drop your file<br>or <span class="browse-link">browse</span></p>
+            <p class="drop-zone-formats">PDF · EPUB · TXT · DOCX · MD</p>
+            <input type="file" id="fileInput" accept=".pdf,.epub,.txt,.docx,.md" hidden>
+            <div class="file-name-wrapper">
+                <span class="file-type-badge" id="fileTypeBadge"></span>
+                <span class="file-name" id="fileName"></span>
+            </div>
+        </div>
+    </div>
+
+    <div class="sidebar-section">
+        <label class="field-label" for="modelSelect">LLM Model</label>
+        <select id="modelSelect" class="select-input">
+            <option value="phi3" selected>phi3 (2.2 GB -- fast)</option>
+            <option value="llama3.1">llama3.1 (4.9 GB)</option>
+            <option value="mistral">mistral (4.1 GB)</option>
+        </select>
+    </div>
+
+    <div class="sidebar-section">
+        <label class="field-label">Embedding Model</label>
+        <div class="embed-model-group" id="embedModelGroup">
+            <label class="embed-radio">
+                <input type="radio" name="embedModel" value="fast">
+                <span class="embed-radio-card">
+                    <span class="embed-radio-name">Fast (MiniLM)</span>
+                    <span class="embed-radio-stats">384 dims &middot; ~0.1s/query</span>
+                </span>
+            </label>
+            <label class="embed-radio">
+                <input type="radio" name="embedModel" value="balanced" checked>
+                <span class="embed-radio-card">
+                    <span class="embed-radio-name">Balanced (BGE)</span>
+                    <span class="embed-radio-stats">1024 dims &middot; ~0.4s/query</span>
+                </span>
+            </label>
+            <label class="embed-radio">
+                <input type="radio" name="embedModel" value="ollama">
+                <span class="embed-radio-card">
+                    <span class="embed-radio-name">Ollama (Nomic)</span>
+                    <span class="embed-radio-stats">768 dims &middot; no download</span>
+                </span>
+            </label>
+        </div>
+        <div class="reindex-banner" id="reindexBanner" style="display:none;">
+            <span>&#9888; Book not indexed with this model.</span>
+            <button class="btn-reindex" id="reindexBtn">Re-index</button>
+        </div>
+    </div>
+
+    <div class="sidebar-section">
+        <label class="field-label">Top-K Chunks: <span id="kValue">5</span></label>
+        <input type="range" id="kSlider" min="3" max="10" value="5" class="slider-input">
+    </div>
+
+    <div class="sidebar-section">
+        <label class="toggle-label">
+            <input type="checkbox" id="useGraph" checked>
+            <span class="toggle-switch"></span>
+            Use concept graph
+        </label>
+    </div>
+
+    <button class="btn-primary" id="ingestBtn" disabled>🚀 Ingest Book</button>
+    <div class="progress-bar-container" id="progressContainer" style="display:none;">
+        <div class="progress-bar" id="progressBar"></div>
+    </div>
+    <button class="btn-secondary" id="newBookBtn" style="display:none;">📖 New Book</button>
+
+    <div class="divider"></div>
+
+    <!-- Status panel -->
+    <div class="status-panel" id="statusPanel">
+        <h3>System Status</h3>
+        <div class="status-row">
+            <span class="status-dot" id="ollamaDot"></span>
+            <span>Ollama</span>
+            <span class="status-value" id="ollamaStatus">checking…</span>
+        </div>
+        <div class="status-row">
+            <span class="status-dot off"></span>
+            <span>Chunks</span>
+            <span class="status-value" id="chunkStatus">—</span>
+        </div>
+        <div class="status-row">
+            <span class="status-dot off"></span>
+            <span>Graph</span>
+            <span class="status-value" id="graphStatus">—</span>
+        </div>
+    </div>
+</aside>
+
+<!-- ── Main Content ─────────────────────────────────────────────────────── -->
+<main class="main">
+    <!-- Tab Bar -->
+    <div class="tab-bar">
+        <button class="tab-btn active" data-tab="chat">💬 Chat</button>
+        <button class="tab-btn" data-tab="graph">🕸 Concept Graph</button>
+        <button class="tab-btn" data-tab="analytics">📊 Analytics</button>
+        <div class="tab-indicator" id="tabIndicator"></div>
+    </div>
+
+    <!-- Tab: Chat -->
+    <div class="tab-panel active" id="tab-chat">
+        <div class="chat-container">
+            <div class="chat-header" id="chatHeader" style="display:none;">
+                <span class="chat-header-label">💬 Conversation</span>
+                <div class="chat-header-actions">
+                    <button class="export-report-btn" id="exportReportBtn" style="display:none;" title="Export Q&A as PDF report">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                            <polyline points="14 2 14 8 20 8"/>
+                            <line x1="16" y1="13" x2="8" y2="13"/>
+                            <line x1="16" y1="17" x2="8" y2="17"/>
+                            <polyline points="10 9 9 9 8 9"/>
+                        </svg>
+                        Export Report
+                    </button>
+                    <button class="clear-history-btn" id="clearHistoryBtn" title="Clear conversation history">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                            <polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10"/>
+                        </svg>
+                        Clear conversation
+                    </button>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages">
+                <div class="welcome-message">
+                    <div class="welcome-icon">📚</div>
+                    <h2>Welcome to Book GPT</h2>
+                    <p>Upload a PDF and ingest it to start asking questions.<br>
+                    Your answers are powered by local LLMs with concept-graph retrieval.</p>
+                </div>
+            </div>
+            <div class="chat-input-bar">
+                <input type="text" id="chatInput" placeholder="Ask a question about the book…" disabled>
+                <button class="send-btn" id="sendBtn" disabled>
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M22 2L11 13M22 2l-7 20-4-9-9-4 20-7z"/>
+                    </svg>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Tab: Graph -->
+    <div class="tab-panel" id="tab-graph">
+        <div class="graph-container">
+            <iframe id="graphFrame" src="about:blank" class="graph-iframe"></iframe>
+        </div>
+        <div class="graph-stats" id="graphStats">
+            <div class="stat-card"><div class="stat-number" id="statNodes">—</div><div class="stat-label">Nodes</div></div>
+            <div class="stat-card"><div class="stat-number" id="statEdges">—</div><div class="stat-label">Edges</div></div>
+        </div>
+        <div class="top-concepts" id="topConcepts"></div>
+    </div>
+
+    <!-- Tab: Analytics -->
+    <div class="tab-panel" id="tab-analytics">
+        <!-- Stats header bar -->
+        <div class="quality-summary" id="qualitySummary" style="display:none;"></div>
+
+        <!-- Scrollable analytics body -->
+        <div class="analytics-scroll">
+            <div class="analytics-container">
+
+                <!-- Section: Chunk Quality -->
+                <section class="analytics-section">
+                    <div class="analytics-card" id="chart-chunk-filtering">
+                        <div class="chart-placeholder">Chunk quality filtering results will appear here.</div>
+                    </div>
+                </section>
+
+                <!-- Section: Token Density -->
+                <section class="analytics-section">
+                    <div class="analytics-card analytics-card--tall" id="chart-token-density">
+                        <div class="chart-placeholder">Ingest a book and run a query to see analytics.</div>
+                    </div>
+                </section>
+
+                <!-- Section: Compare Embedding Models -->
+                <section class="analytics-section">
+                    <div class="analytics-card analytics-card--compare" id="chart-model-comparison">
+                        <div class="compare-empty-state">
+                            <div class="compare-empty-icon">
+                                <svg width="48" height="48" viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                    <rect x="4" y="28" width="8" height="16" rx="2" fill="rgba(139,92,246,0.25)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5"/>
+                                    <rect x="16" y="18" width="8" height="26" rx="2" fill="rgba(80,200,120,0.25)" stroke="rgba(80,200,120,0.6)" stroke-width="1.5"/>
+                                    <rect x="28" y="8" width="8" height="36" rx="2" fill="rgba(99,160,210,0.25)" stroke="rgba(99,160,210,0.6)" stroke-width="1.5"/>
+                                    <rect x="40" y="22" width="4" height="22" rx="2" fill="rgba(255,167,38,0.25)" stroke="rgba(255,167,38,0.6)" stroke-width="1.5"/>
+                                </svg>
+                            </div>
+                            <h3 class="compare-empty-title">No comparison data yet</h3>
+                            <p class="compare-empty-subtitle">Run a query first, then compare all indexed embedding models side-by-side.</p>
+                            <button class="btn-compare" id="compareModelsBtn" disabled>&#128202; Compare Embedding Models</button>
+                        </div>
+                    </div>
+                </section>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- Model comparison modal -->
+    <div class="modal-overlay" id="compareModal" style="display:none;">
+        <div class="modal-content">
+            <button class="modal-close" id="closeCompareModal">&times;</button>
+            <div id="compareChartContainer"></div>
+            <div id="compareDetails"></div>
+        </div>
+    </div>
+</main>
+
+<script src="/static/script.js?v=5"></script>
+</body>
+</html>

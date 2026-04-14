@@ -1,0 +1,28 @@
+# Virtual environments
+.venv/
+venv/
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+
+# Uploads (user files — never commit)
+uploads/
+
+# ChromaDB persistent store
+chroma_store/
+
+# Flask sessions
+flask_session/
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Graph HTML (auto-generated)
+graph.html
