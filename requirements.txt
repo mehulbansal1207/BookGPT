@@ -17,4 +17,4 @@ pandas
 spacy
 networkx
 pyvis
-rebel-large
+langchain-text-splitters

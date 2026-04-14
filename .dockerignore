@@ -1,0 +1,14 @@
+.git
+.venv
+venv
+__pycache__
+*.pyc
+*.pyo
+chroma_store/
+uploads/
+*.egg-info
+.env
+*.whl
+*.tar.gz
+node_modules/
+.gitignore

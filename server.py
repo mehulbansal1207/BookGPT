@@ -610,9 +610,15 @@ def _kill_stale_server(port: int = 5000):
 
 
 if __name__ == "__main__":
-    _kill_stale_server(5000)
-    logger.info("Starting Book GPT server...")
+    import argparse
+    parser = argparse.ArgumentParser(description="Book GPT Server")
+    parser.add_argument("--port", type=int, default=5000,
+                        help="Port to run the server on (default: 5000)")
+    args = parser.parse_args()
+
+    _kill_stale_server(args.port)
+    logger.info("Starting Book GPT server on port %d...", args.port)
     logger.info("Pre-loading ChromaDB client...")
     get_chroma_client()
-    logger.info("Server ready at http://localhost:5000")
-    app.run(host="0.0.0.0", port=5000, debug=False, threaded=True)
+    logger.info("Server ready at http://localhost:%d", args.port)
+    app.run(host="0.0.0.0", port=args.port, debug=False, threaded=True)
