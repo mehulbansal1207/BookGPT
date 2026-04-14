@@ -1,16 +1,18 @@
 FROM python:3.11-slim
 
-# HF Spaces expects port 7860
 ENV PORT=7860
-ENV OLLAMA_HOST=http://localhost:11434
+ENV OLLAMA_HOST=0.0.0.0:11434
 
 WORKDIR /app
 
-# Install system dependencies + Ollama
+# Install system dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl gcc g++ && \
-    rm -rf /var/lib/apt/lists/* && \
-    curl -fsSL https://ollama.com/install.sh | sh
+    rm -rf /var/lib/apt/lists/*
+
+# Install Ollama binary directly (no install script)
+RUN curl -fsSL -o /usr/local/bin/ollama https://ollama.com/download/ollama-linux-amd64 && \
+    chmod +x /usr/local/bin/ollama
 
 # Python dependencies
 COPY requirements.txt .
