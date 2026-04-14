@@ -1,3 +1,14 @@
+---
+title: BookGPT
+emoji: 📚
+colorFrom: indigo
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+---
+
 # 📚 Book GPT — Local Graph-Augmented RAG
 
 **Ask questions about any book using a hybrid retrieval engine that combines vector search with concept-graph traversal — fully local, no APIs, no data leaves your machine.**
